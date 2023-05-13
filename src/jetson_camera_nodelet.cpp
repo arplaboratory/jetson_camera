@@ -20,7 +20,7 @@ public:
 	~JetsonCameraNodelet()
 	{
 		is_running_ = false;
-		cap_thread_->join();
+		//cap_thread_->join();
 	}
 
 private:
@@ -34,14 +34,18 @@ private:
 	ros::NodeHandle nh_, nh_priv_;
 	image_transport::CameraPublisher pub_;
 	int cap_width_, cap_height_;
-	int width_, height_, framerate_;
+	int width_, height_, framerate_, output_framerate_;
 	int flip_method_;
 	std::string frame_id_;
 	double delay_;
 	sensor_msgs::CameraInfo cam_info_;
 
-	std::shared_ptr<std::thread> cap_thread_;
+	//std::shared_ptr<std::thread> cap_thread_;
 	std::atomic<bool> is_running_;
+
+	cv::VideoCapture cap;
+	cv_bridge::CvImage img;
+	ros::Timer timer;
 
 	void onInit() override
 	{
@@ -57,6 +61,7 @@ private:
 		width_ = nh_priv_.param<int>("width", 640);
 		height_ = nh_priv_.param<int>("height", 480);
 		framerate_ = nh_priv_.param<int>("fps", 60);
+		output_framerate_ = nh_priv_.param<int>("output_fps", 30);
 
 		flip_method_ = nh_priv_.param<int>("flip_method", 0);
 
@@ -99,9 +104,21 @@ private:
 		pub_ = it_priv.advertiseCamera(topic_name, 1);
 
 		is_running_ = true;
-		cap_thread_ = std::shared_ptr<std::thread>(new std::thread(std::bind(&JetsonCameraNodelet::captureFunc, this)));
+
+		std::string pipeline = gstreamer_pipeline(cap_width_, cap_height_, width_, height_, framerate_, flip_method_);
+		NODELET_INFO("Pipeline: %s", pipeline.c_str());
+
+		cap.open(pipeline, cv::CAP_GSTREAMER);
+
+		img.encoding = sensor_msgs::image_encodings::BGR8;
+		img.header.frame_id = frame_id_;
+		timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this); 
+
+		//cap_thread_ = std::shared_ptr<std::thread>(new std::thread(std::bind(&JetsonCameraNodelet::captureFunc, this)));
 	}
 
+
+	/*
 	void captureFunc()
 	{
 		std::string pipeline = gstreamer_pipeline(cap_width_, cap_height_, width_, height_, framerate_, flip_method_);
@@ -111,6 +128,7 @@ private:
 		img.encoding = sensor_msgs::image_encodings::BGR8;
 		img.header.frame_id = frame_id_;
 
+		timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this); 
 		while (is_running_.load())
 		{
 			if (cap.read(img.image))
@@ -120,6 +138,18 @@ private:
 				pub_.publish(*img.toImageMsg(), cam_info_);
 			}
 		}
+	}
+	*/
+
+	void publish(const ros::TimerEvent& event)
+	{
+		if (is_running_.load() && cap.read(img.image))
+		{
+			img.header.stamp = ros::Time::now() - ros::Duration(delay_);
+			cam_info_.header.stamp = img.header.stamp;
+			pub_.publish(*img.toImageMsg(), cam_info_);
+		}
+
 	}
 
 };
