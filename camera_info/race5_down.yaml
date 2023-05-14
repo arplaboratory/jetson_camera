@@ -1,0 +1,22 @@
+# Camera intrinsics
+image_width: 640
+image_height: 360
+camera_name: camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [394.393569, 0.000000, 354.549489, 0.000000, 395.095991, 204.198441, 0.000000, 0.000000, 1.000000]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.310406, 0.079798, 0.000018, -0.000348, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [293.574982, 0.000000, 372.528364, 0.000000, 0.000000, 363.381683, 207.551168, 0.000000, 0.000000, 0.000000, 1.000000, 0.000000]
+
