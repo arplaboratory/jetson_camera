@@ -21,7 +21,7 @@
     <group ns="$(arg mav_name)">
 
     	<!--node pkg="nodelet" type="nodelet" name="downward_camera" args="load cv_camera/CvCameraNodelet nodelet_manager" clear_params="true"--> 
-    	<node pkg="jetson_camera" type="jetson_camera_node" name="main_camera" clear_params="true" output="screen">
+    	<node pkg="jetson_camera" type="jetson_camera_node" name="$(arg mav_name)_main_camera" clear_params="true" output="screen">
         	<param name="cap_width" value="1280"/>
         	<param name="cap_height" value="720"/>
         	<param name="width" value="640"/>
