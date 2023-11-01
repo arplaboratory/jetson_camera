@@ -40,12 +40,16 @@ private:
 	double delay_;
 	sensor_msgs::CameraInfo cam_info_;
 
-	//std::shared_ptr<std::thread> cap_thread_;
+	std::shared_ptr<std::thread> cap_thread_;
 	std::atomic<bool> is_running_;
+	bool throttle_;
 
 	cv::VideoCapture cap;
 	cv_bridge::CvImage img;
 	ros::Timer timer;
+	std::chrono::high_resolution_clock::time_point current_timestamp{};
+	std::chrono::high_resolution_clock::time_point last_timestamp{};
+	double output_duration_;
 
 	void onInit() override
 	{
@@ -71,6 +75,8 @@ private:
 		std::string topic_name = nh_priv_.param<std::string>("topic_name", "image_raw");
 
 		std::string url = nh_priv_.param<std::string>("camera_info_url", "");
+
+		throttle_ = nh_priv_.param<bool>("throttle", false);
 
 		camera_info_manager::CameraInfoManager info_manager(nh_, "camera", url);
 
@@ -112,41 +118,41 @@ private:
 
 		img.encoding = sensor_msgs::image_encodings::BGR8;
 		img.header.frame_id = frame_id_;
-		timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this); 
+		output_duration_ = 1.0 / output_framerate_;
+		// timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this);
 
-		//cap_thread_ = std::shared_ptr<std::thread>(new std::thread(std::bind(&JetsonCameraNodelet::captureFunc, this)));
+		cap_thread_ = std::shared_ptr<std::thread>(new std::thread(std::bind(&JetsonCameraNodelet::captureFunc, this)));
 	}
 
 
-	/*
 	void captureFunc()
 	{
-		std::string pipeline = gstreamer_pipeline(cap_width_, cap_height_, width_, height_, framerate_, flip_method_);
-		NODELET_INFO("Pipeline: %s", pipeline.c_str());
-		cv::VideoCapture cap(pipeline, cv::CAP_GSTREAMER);
-		cv_bridge::CvImage img;
-		img.encoding = sensor_msgs::image_encodings::BGR8;
-		img.header.frame_id = frame_id_;
-
-		timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this); 
+		// timer=nh_.createTimer(ros::Duration(1.0/output_framerate_), &JetsonCameraNodelet::publish, this);
 		while (is_running_.load())
 		{
 			if (cap.read(img.image))
 			{
 				img.header.stamp = ros::Time::now() - ros::Duration(delay_);
 				cam_info_.header.stamp = img.header.stamp;
-				pub_.publish(*img.toImageMsg(), cam_info_);
+				if (throttle_) {
+					current_timestamp = std::chrono::high_resolution_clock::now();
+					if (std::chrono::duration_cast<std::chrono::duration<double>>(current_timestamp - last_timestamp).count() > output_duration_) {
+						pub_.publish(*img.toImageMsg(), cam_info_);
+						last_timestamp = current_timestamp;
+					}
+				} else {
+					pub_.publish(*img.toImageMsg(), cam_info_);
+				}
 			}
 		}
 	}
-	*/
 
 	void publish(const ros::TimerEvent& event)
 	{
 		if (is_running_.load() && cap.read(img.image))
 		{
-			img.header.stamp = ros::Time::now() - ros::Duration(delay_);
-			cam_info_.header.stamp = img.header.stamp;
+			//img.header.stamp = ros::Time::now() - ros::Duration(delay_);
+			//cam_info_.header.stamp = img.header.stamp;
 			pub_.publish(*img.toImageMsg(), cam_info_);
 		}
 
